@@ -1,30 +1,49 @@
-const redis = require("redis");
-const express = require("express");
+(async () => {
+    const redis = require("redis");
+    const express = require("express");
+    const nodemailer = require("nodemailer");
+    const cors = require("cors");
 
-const app = express();
-const redisClient = redis.createClient({
-    url: "redis://redis",
-});
+    const app = express();
+    app.use(cors());
 
-app.get("/", async (req, res) => {
+    const redisClient = redis.createClient({
+        url: "redis://redis",
+    });
     await redisClient.connect();
-    const keys = await redisClient.keys("message*");
-    Promise.all(
-        keys.map(async (key) => {
-            const value = await redisClient.get(key);
 
-            return `<div>${value}</div>`;
-        })
-    ).then((values) => res.send(values.join("")));
-    await redisClient.quit();
-});
+    const transporter = nodemailer.createTransport({
+        host: "mailhog",
+        port: 1025,
+    });
 
-app.get("/add", async (req, res) => {
-    const messageId = "message" + Date.now();
-    await redisClient.connect();
-    await redisClient.set(messageId, req.query.message);
-    res.send("record was added as " + messageId);
-    await redisClient.quit();
-});
+    app.get("/", async (req, res) => {
+        const keys = await redisClient.keys("message*");
+        Promise.all(keys.map(async (key) => await redisClient.get(key))).then(
+            (values) => res.send(values)
+        );
+    });
 
-app.listen(3000);
+    app.get("/reset", async (req, res) => {
+        const keys = await redisClient.keys("message*");
+        keys.forEach((key) => redisClient.del(key));
+        res.send("Done!");
+    });
+
+    app.get("/add", async (req, res) => {
+        const messageId = "message" + Date.now();
+
+        await redisClient.set(messageId, req.query.message);
+
+        transporter.sendMail({
+            from: "Example <test@example.com>",
+            to: "test@example.com",
+            subject: "Welcome to the docker example",
+            text: `Message with "${messageId}" and body "${req.query.message}" was stored!`,
+        });
+
+        res.send("record was added as " + messageId);
+    });
+
+    app.listen(3000);
+})();

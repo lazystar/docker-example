@@ -13,9 +13,16 @@ services:
             - 3000:3000
         volumes:
             - ./server:/src
-    # frontend:
-    #     image: nginx
-    #     ports:
-    #         - 80:80
-    #     volumes:
-    #         - ./frontend/build:/usr/share/nginx/html
+    frontend:
+        image: nginx
+        ports:
+            - 80:80
+        volumes:
+            - ./frontend/build:/usr/share/nginx/html
+    mailhog:
+        image: mailhog/mailhog
+        logging:
+            driver: "none" # disable saving logs
+        ports:
+            - 1025:1025 # smtp server
+            - 8025:8025 # web ui
